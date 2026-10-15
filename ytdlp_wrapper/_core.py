@@ -45,12 +45,16 @@ def ytdlp_client_args(s) -> List[str]:
         bgutil plugin to mint PO tokens even when yt-dlp would mark the
         request as optional — needed against the bot wall from datacenter
         IPs), otherwise fetch_pot=never (no pings to a dead provider);
-      · player-client=web_embedded,mweb so the default web client's
-        "Sign in to confirm you're not a bot" check is avoided.
+      · player-client=android_vr,web_embedded: android_vr returns PLAIN
+        (unciphered) googlevideo URLs and needs no PO token, so yt-dlp
+        skips the slow nsig/deno decipher path (~15-20s) and extraction
+        drops to a few seconds; web_embedded stays as fallback (with the
+        cookies jar it still resolves when android_vr is refused).
+        mweb was dropped: its gvs URLs demand a GVS PO token we don't mint.
     """
     pot_args = ytdlp_pot_args(s)
     hay_pot = s.yt_pot_enabled and any("youtubepot-bgutilhttp:base_url=" in a for a in pot_args)
-    pares = ["fetch_pot=always" if hay_pot else "fetch_pot=never", "player-client=web_embedded,mweb"]
+    pares = ["fetch_pot=always" if hay_pot else "fetch_pot=never", "player-client=android_vr,web_embedded"]
     return ["--extractor-args", "youtube:" + ";".join(pares)]
 
 
