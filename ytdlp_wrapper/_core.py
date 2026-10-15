@@ -33,16 +33,25 @@ def ytdlp_pot_args(s) -> List[str]:
     return []
 
 
-def ytdlp_client_args() -> List[str]:
-    """Forced YouTube player-client args; must be the LAST --extractor-args.
+def ytdlp_client_args(s) -> List[str]:
+    """The single LAST youtube: --extractor-args flag; it merges every pair.
 
-    yt-dlp keeps only the last --extractor-args per extractor key, so these
-    are appended after ytdlp_pot_args()' youtube:fetch_pot=never (and after
-    any config-file args) so web_embedded stays active. The default web
-    client hits "Sign in to confirm you're not a bot" from non-residential
-    IPs; web_embedded avoids the bot check (same trick as the local backend).
+    yt-dlp keeps only the last --extractor-args per extractor key, so this
+    flag is appended after ytdlp_pot_args() and any config-file args. Pairs
+    inside one flag are separated by ';' (commas belong to values like the
+    client list), so:
+
+      · fetch_pot=always when the POT provider is reachable (forces the
+        bgutil plugin to mint PO tokens even when yt-dlp would mark the
+        request as optional — needed against the bot wall from datacenter
+        IPs), otherwise fetch_pot=never (no pings to a dead provider);
+      · player-client=web_embedded,mweb so the default web client's
+        "Sign in to confirm you're not a bot" check is avoided.
     """
-    return ["--extractor-args", "youtube:player-client=web_embedded,mweb"]
+    pot_args = ytdlp_pot_args(s)
+    hay_pot = s.yt_pot_enabled and any("youtubepot-bgutilhttp:base_url=" in a for a in pot_args)
+    pares = ["fetch_pot=always" if hay_pot else "fetch_pot=never", "player-client=web_embedded,mweb"]
+    return ["--extractor-args", "youtube:" + ";".join(pares)]
 
 
 def ytdlp_network_args(s) -> List[str]:
@@ -148,11 +157,12 @@ async def run_ytdlp_ex(
     if cookie_ids and "--no-warnings" in flags:
         flags = [f for f in flags if f != "--no-warnings"]
 
-    # Build final args: network (proxy/IP family) + credentials + flags + forced
-    # player-client + '--' + urls. ytdlp_client_args() must come after every
-    # other youtube: --extractor-args (last same-key flag wins in yt-dlp) and
-    # before '--' (after it everything is a positional URL).
-    all_args = ytdlp_network_args(s) + list(cred_args) + flags + ytdlp_client_args()
+    # Build final args: network (proxy/IP family) + credentials + flags +
+    # merged youtube: args (fetch_pot + player-client) + '--' + urls.
+    # ytdlp_client_args(s) must come after every other youtube:
+    # --extractor-args (last same-key flag wins in yt-dlp) and before '--'
+    # (after it everything is a positional URL).
+    all_args = ytdlp_network_args(s) + list(cred_args) + flags + ytdlp_client_args(s)
     if urls:
         all_args.append("--")
         all_args.extend(urls)

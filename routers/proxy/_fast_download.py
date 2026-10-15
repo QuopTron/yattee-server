@@ -68,7 +68,7 @@ async def run_ytdlp_download(
             s.ytdlp_path,
             *ytdlp_network_args(s),  # Egress proxy + forced IP family
             *cred_args,  # Include credential args (cookies, etc.)
-            *ytdlp_client_args(),  # After network args: last youtube: extractor-args wins
+            *ytdlp_client_args(s),  # After network args: merged youtube: args (fetch_pot + player-client)
             "-f",
             itag,
             "--no-part",  # Don't use .part files
