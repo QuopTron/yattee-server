@@ -33,6 +33,18 @@ def ytdlp_pot_args(s) -> List[str]:
     return []
 
 
+def ytdlp_client_args() -> List[str]:
+    """Forced YouTube player-client args; must be the LAST --extractor-args.
+
+    yt-dlp keeps only the last --extractor-args per extractor key, so these
+    are appended after ytdlp_pot_args()' youtube:fetch_pot=never (and after
+    any config-file args) so web_embedded stays active. The default web
+    client hits "Sign in to confirm you're not a bot" from non-residential
+    IPs; web_embedded avoids the bot check (same trick as the local backend).
+    """
+    return ["--extractor-args", "youtube:player-client=web_embedded,mweb"]
+
+
 def ytdlp_network_args(s) -> List[str]:
     """Network-related yt-dlp args from settings: egress proxy + forced IP family.
 
@@ -136,9 +148,11 @@ async def run_ytdlp_ex(
     if cookie_ids and "--no-warnings" in flags:
         flags = [f for f in flags if f != "--no-warnings"]
 
-    # Build final args: network (proxy/IP family) + credentials + flags + '--' + urls
-    # The '--' separator prevents URLs from being interpreted as flags
-    all_args = ytdlp_network_args(s) + list(cred_args) + flags
+    # Build final args: network (proxy/IP family) + credentials + flags + forced
+    # player-client + '--' + urls. ytdlp_client_args() must come after every
+    # other youtube: --extractor-args (last same-key flag wins in yt-dlp) and
+    # before '--' (after it everything is a positional URL).
+    all_args = ytdlp_network_args(s) + list(cred_args) + flags + ytdlp_client_args()
     if urls:
         all_args.append("--")
         all_args.extend(urls)

@@ -27,6 +27,7 @@ from ytdlp_wrapper import (
     is_valid_url,
     sanitize_extension,
     sanitize_format_id,
+    ytdlp_client_args,
     ytdlp_network_args,
 )
 
@@ -67,6 +68,7 @@ async def run_ytdlp_download(
             s.ytdlp_path,
             *ytdlp_network_args(s),  # Egress proxy + forced IP family
             *cred_args,  # Include credential args (cookies, etc.)
+            *ytdlp_client_args(),  # After network args: last youtube: extractor-args wins
             "-f",
             itag,
             "--no-part",  # Don't use .part files

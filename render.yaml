@@ -1,0 +1,16 @@
+# Despliegue en Render (plan Free, sin tarjeta).
+# "New +" → Blueprint → este repositorio. El build usa el Dockerfile de la raíz.
+services:
+  - type: web
+    name: yattee
+    runtime: docker
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      # El admin se auto-provisiona en cada arranque (env_provisioning).
+      - key: ADMIN_USERNAME
+        value: admin
+      # Render genera y muestra la contraseña en el dashboard: cópiala y
+      # úsala como YATTEE_AUTH ("admin:<contraseña>") en Pages.
+      - key: ADMIN_PASSWORD
+        generateValue: true

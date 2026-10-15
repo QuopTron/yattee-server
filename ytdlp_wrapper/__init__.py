@@ -13,6 +13,7 @@ from ytdlp_wrapper._core import (
     _separate_flags_and_urls,
     run_ytdlp,
     run_ytdlp_ex,
+    ytdlp_client_args,
     ytdlp_network_args,
     ytdlp_pot_args,
 )
@@ -60,6 +61,7 @@ __all__ = [
     "YtDlpRun",
     "run_ytdlp",
     "run_ytdlp_ex",
+    "ytdlp_client_args",
     "ytdlp_network_args",
     "ytdlp_pot_args",
     # _youtube

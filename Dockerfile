@@ -77,4 +77,6 @@ ENV DATA_DIR=/app/data
 
 EXPOSE 8085
 
-CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8085", "--log-level", "info"]
+# Shell form: los PaaS (Render) inyectan $PORT en runtime; sin ella se usa
+# 8085 (el ENV de arriba), que sigue siendo el puerto local de docker-compose.
+CMD uvicorn server:app --host 0.0.0.0 --port ${PORT:-8085} --log-level info
