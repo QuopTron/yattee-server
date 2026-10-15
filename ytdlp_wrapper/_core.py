@@ -45,22 +45,18 @@ def ytdlp_client_args(s) -> List[str]:
         bgutil plugin to mint PO tokens even when yt-dlp would mark the
         request as optional — needed against the bot wall from datacenter
         IPs), otherwise fetch_pot=never (no pings to a dead provider);
-      · player-client=android,web_embedded: android returns PLAIN (unciphered)
-        googlevideo URLs, so yt-dlp skips the slow nsig/deno decipher path
-        (~20s from datacenter IPs) — it needs a PO token on gvs, which the
-        provider mints via fetch_pot=always; web_embedded is the deciphered,
-        tokenless fallback (cookies jar) when the provider is down.
-        android_vr was tried and fails here (gvs 403 without a PO token);
-        mweb demands a GVS PO token we don't mint.
+      · player-client=web_embedded,mweb so the default web client's
+        "Sign in to confirm you're not a bot" check is avoided. android+pot
+        was tried here and OOM-killed every cold extraction on Render free
+        (512MB); android_vr gets a gvs 403 without a PO token.
     """
     pot_args = ytdlp_pot_args(s)
     hay_pot = s.yt_pot_enabled and any("youtubepot-bgutilhttp:base_url=" in a for a in pot_args)
-    # android returns PLAIN googlevideo URLs: no nsig/deno decipher inside
-    # yt-dlp (the ~20s hog from datacenter IPs). It DOES require a PO token
-    # on gvs, so it only pays off with the pot provider enabled — hence the
-    # fetch_pot=always coupling. web_embedded stays as the deciphered fallback
-    # (it works tokenless with the cookies jar when the provider is down).
-    pares = ["fetch_pot=always" if hay_pot else "fetch_pot=never", "player-client=android,web_embedded"]
+    # web_embedded,mweb: the stable pair proven on 512MB. android(+pot) was
+    # tried and OOM-killed every cold extraction on Render free; android_vr
+    # gets a gvs 403 without a PO token. Keep fetch_pot=never unless the
+    # provider is actually reachable (ytdlp_pot_args already handles that).
+    pares = ["fetch_pot=always" if hay_pot else "fetch_pot=never", "player-client=web_embedded,mweb"]
     return ["--extractor-args", "youtube:" + ";".join(pares)]
 
 
