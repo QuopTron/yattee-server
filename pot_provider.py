@@ -27,7 +27,10 @@ POT_PORT = 4416
 DEFAULT_BASE_URL = f"http://127.0.0.1:{POT_PORT}"
 
 _TERMINATE_GRACE = 5
-_READY_ATTEMPTS = 15
+# Node's cold JS boot takes ~1s on a normal box but 10-15s+ on a throttled
+# 512MB Render instance — a 15s window expired 1s before the server answered
+# /ping in production. 60s covers the worst cold boot observed.
+_READY_ATTEMPTS = 60
 _MAX_BACKOFF = 60
 
 
@@ -147,12 +150,20 @@ class PotProviderManager:
                 logger.error("POT provider spawn failed: %s", e)
             else:
                 pump = asyncio.create_task(self._pump_logs(self._proc))
+                heal = None
                 if await self._wait_ready(self._proc):
                     self._healthy = True
                     backoff = 1
                     logger.info("POT provider ready at %s", DEFAULT_BASE_URL)
+                else:
+                    # The server can outlive the readiness window (slow cold
+                    # boot) and keep running fine — without this, the supervisor
+                    # would block on wait() with _healthy stuck False forever.
+                    heal = asyncio.create_task(self._heal_when_ready(self._proc))
                 await self._proc.wait()
                 pump.cancel()
+                if heal is not None:
+                    heal.cancel()
                 self._healthy = False
                 if self._stopping:
                     return
@@ -173,6 +184,18 @@ class PotProviderManager:
             await asyncio.sleep(1)
         logger.warning("POT provider did not become ready within %ss", _READY_ATTEMPTS)
         return False
+
+    async def _heal_when_ready(self, proc: asyncio.subprocess.Process) -> None:
+        """Late readiness: flip healthy when /ping answers after the window."""
+        try:
+            while proc.returncode is None:
+                if await _ping():
+                    self._healthy = True
+                    logger.info("POT provider became ready (late) at %s", DEFAULT_BASE_URL)
+                    return
+                await asyncio.sleep(2)
+        except asyncio.CancelledError:
+            pass
 
     async def _pump_logs(self, proc: asyncio.subprocess.Process) -> None:
         assert proc.stdout is not None
