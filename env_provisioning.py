@@ -1,10 +1,14 @@
 """Auto-provisioning from environment variables for automated deployments."""
 
+import base64
 import logging
+
+from cryptography.fernet import InvalidToken
 
 import auth
 import config
 import database
+import encryption
 import settings as settings_module
 
 logger = logging.getLogger(__name__)
@@ -14,12 +18,14 @@ def apply_env_provisioning():
     """Apply provisioning from environment variables (runs once at startup).
 
     - ADMIN_USERNAME + ADMIN_PASSWORD: creates or updates admin user
+    - YT_COOKIES_YOUTUBE_B64 / YT_COOKIES_YOUTUBE: provisions YouTube cookies (survives ephemeral disk)
     - INVIDIOUS_INSTANCE_URL: configures Invidious instance and enables proxy
     - YT_EGRESS_PROXY: configures HTTP/SOCKS proxy for YouTube-bound traffic
     - YT_IP_FAMILY: forces IP family (auto/ipv4/ipv6) for YouTube-bound traffic
     - YT_POT_ENABLED + YT_POT_PROVIDER_URL: configures the PO token provider
     """
     _provision_admin_user()
+    _provision_cookies_youtube()
     _provision_invidious()
     _provision_egress_proxy()
     _provision_ip_family()
@@ -42,6 +48,65 @@ def _provision_admin_user():
     else:
         database.create_admin(username, auth.hash_password(password))
         logger.info("ENV provisioning: created admin user '%s'", username)
+
+
+def _provision_cookies_youtube():
+    """Provision the YouTube cookies_file credential from env vars.
+
+    The data directory (SQLite DB + encryption key) is ephemeral on PaaS
+    hosts, so cookies uploaded through the API vanish on every restart or
+    redeploy. When YT_COOKIES_YOUTUBE_B64 (or YT_COOKIES_YOUTUBE) is set,
+    the credential is (re)created at every startup, making cookies durable
+    across restarts. The env value is the source of truth: it replaces any
+    existing cookies_file credential on the YouTube site.
+    """
+    cookies = None
+    if config.YT_COOKIES_YOUTUBE_B64:
+        compact = "".join(config.YT_COOKIES_YOUTUBE_B64.split())
+        try:
+            cookies = base64.b64decode(compact, validate=True).decode("utf-8")
+        except (ValueError, UnicodeDecodeError) as exc:
+            logger.warning("ENV provisioning: ignoring invalid YT_COOKIES_YOUTUBE_B64 (%s)", exc)
+            return
+    elif config.YT_COOKIES_YOUTUBE:
+        cookies = config.YT_COOKIES_YOUTUBE
+
+    if not cookies or "youtube.com" not in cookies:
+        logger.warning("ENV provisioning: YT_COOKIES_YOUTUBE(_B64) does not look like YouTube cookies; ignoring")
+        return
+
+    site = database.get_site_by_extractor("youtube")
+    if site:
+        site_id = site["id"]
+    else:
+        site_id = database.create_site(
+            name="YouTube", extractor_pattern="youtube", enabled=True, priority=100, proxy_streaming=False
+        )
+
+    stored = encryption.encrypt(cookies) if encryption.should_encrypt("cookies_file") else cookies
+
+    identical = False
+    for cred in database.get_cookie_credentials(site_id):
+        try:
+            current = encryption.decrypt(cred["value"]) if cred["is_encrypted"] else cred["value"]
+        except (InvalidToken, ValueError):
+            current = None
+        if current == cookies:
+            identical = True
+        else:
+            database.delete_credential(cred["id"])
+
+    if identical:
+        logger.info("ENV provisioning: YouTube cookies_file credential already up to date")
+        return
+
+    database.add_credential(
+        site_id=site_id,
+        credential_type="cookies_file",
+        value=stored,
+        is_encrypted=encryption.should_encrypt("cookies_file"),
+    )
+    logger.info("ENV provisioning: provisioned YouTube cookies_file credential (%d bytes)", len(cookies))
 
 
 def _provision_invidious():

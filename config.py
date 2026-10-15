@@ -53,6 +53,15 @@ YT_IP_FAMILY = os.getenv("YT_IP_FAMILY") or None
 YT_POT_ENABLED = os.getenv("YT_POT_ENABLED") or None
 YT_POT_PROVIDER_URL = os.getenv("YT_POT_PROVIDER_URL") or None
 
+# YouTube cookies for yt-dlp (datacenter IPs trigger the bot wall without them).
+# YT_COOKIES_YOUTUBE_B64: base64-encoded Netscape cookies.txt (preferred, single line).
+# YT_COOKIES_YOUTUBE: raw cookies.txt content (fallback).
+# Provisioned as a cookies_file credential at startup (see env_provisioning.py)
+# because the data directory is ephemeral on PaaS hosts (e.g. Render free),
+# which wipes uploaded credentials on every restart/redeploy.
+YT_COOKIES_YOUTUBE_B64 = os.getenv("YT_COOKIES_YOUTUBE_B64") or None
+YT_COOKIES_YOUTUBE = os.getenv("YT_COOKIES_YOUTUBE") or None
+
 # Additional CIDR ranges to permit through the SSRF guard.
 # Comma-separated list of IPv4/IPv6 networks in CIDR notation, e.g.
 # "10.20.30.0/24,fd00::/8" — useful when a backing service (Invidious /
