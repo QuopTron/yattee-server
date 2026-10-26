@@ -251,6 +251,9 @@ async def diag(test: int = 0, id: str = ""):
 
     inicio = _t.time()
     try:
+        # La prueba sigue el camino real: si el provider vive en otro servicio
+        # free que se durmió, se lo espera igual que en /videos.
+        await pot_provider.despertar_externo()
         info = await get_video_info(id or "dQw4w9WgXcQ", use_cache=False)
         formatos = [f for f in (info.get("formats") or []) if str(f.get("acodec")) != "none"]
         resultado = {
