@@ -157,6 +157,21 @@ def _provision_pot():
     enabled = config.YT_POT_ENABLED
     url = config.YT_POT_PROVIDER_URL
     if enabled is None and url is None:
+        # Sin variable explícita: si la imagen trae el provider horneado, se
+        # enciende solo. En un host de datacenter (Render, Fly, Railway) sin PO
+        # token YouTube contesta con el muro de bot y /videos devuelve 404 en
+        # TODO; con token la extracción vuelve. Las cookies no alcanzan: la
+        # sesión se considera deslogueada desde esas IPs.
+        import pot_provider
+
+        if not pot_provider.bundle_available():
+            return
+        s = settings_module.load_settings()
+        if s.yt_pot_enabled:
+            return
+        s.yt_pot_enabled = True
+        settings_module.save_settings(s)
+        logger.info("ENV provisioning: POT provider encontrado en la imagen; se habilita solo")
         return
 
     s = settings_module.load_settings()
