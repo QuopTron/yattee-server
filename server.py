@@ -273,7 +273,7 @@ async def diag(test: int = 0, id: str = ""):
         resultado = {
             "ok": False,
             "ms": round((_t.time() - inicio) * 1000),
-            "error": str(e)[:400],
+            "error": str(e)[:1600],
         }
     _diag_cache.update({"at": _t.time(), "data": resultado, "id": id or "dQw4w9WgXcQ"})
     return {**datos, "test": resultado}
