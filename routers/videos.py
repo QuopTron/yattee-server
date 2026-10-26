@@ -10,6 +10,7 @@ import avatar_cache
 import database
 import innertube
 import invidious_proxy
+import pot_provider
 from basic_auth import get_current_user_from_request
 from converters import (
     invidious_to_video_list_item,
@@ -173,6 +174,11 @@ async def get_video(
         return response
 
     async def _via_hybrid() -> VideoResponse:
+        # El provider de PO tokens puede vivir en otro servicio free que se
+        # duerme: sin esperar su arranque, yt-dlp pide el token con un timeout
+        # corto, se queda sin él y choca con el muro de bot aunque todo esté
+        # bien configurado. Cuando está despierto esto cuesta un ping.
+        await pot_provider.despertar_externo()
         response = await _get_video_hybrid(
             video_id, base_url, proxy_streams=proxy_streams,
             proxy_mode=effective_proxy_mode, user_id=user_id,

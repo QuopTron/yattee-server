@@ -14,6 +14,7 @@ import asyncio
 import logging
 import os
 from pathlib import Path
+from time import monotonic
 from typing import Optional
 
 import httpx
@@ -283,24 +284,52 @@ def auto_heal_habilitado() -> bool:
     return valor not in ("false", "0", "no")
 
 
-async def despertar_externo() -> None:
-    """Despierta el provider EXTERNO (otro servicio que puede estar dormido).
+async def despertar_externo(espera_s: float = 45.0) -> bool:
+    """Despierta el provider EXTERNO y espera a que pueda mintear.
 
-    Un plan free apaga la instancia por inactividad y el primer mint pagaría
-    30-50 s de arranque, justo cuando el reproductor ya está esperando. La
-    búsqueda siempre llega antes que la extracción, así que se aprovecha ese
-    momento para picar el provider (best-effort, nunca lanza).
+    Un plan free apaga la instancia por inactividad. yt-dlp pide el token con
+    un timeout corto, así que si el provider está arrancando la extracción
+    sigue SIN PO token y choca igual con el muro de bot ("Sign in to confirm
+    you're not a bot") aunque el provider esté bien configurado. Por eso acá se
+    espera —acotado— a que conteste `/ping` y, si estaba dormido, se paga un
+    mint en vacío para que la extracción no pague también el arranque de
+    BotGuard. Devuelve si quedó listo; nunca lanza.
     """
     try:
         from settings import get_settings
 
         url = get_settings().effective_pot_provider_url()
         if not url:
-            return
-        async with httpx.AsyncClient(timeout=8.0) as client:
-            await client.get(f"{url.rstrip('/')}/ping")
+            return True
+        base = url.rstrip("/")
+        limite = monotonic() + espera_s
+        dormido = False
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            while True:
+                try:
+                    respuesta = await client.get(f"{base}/ping")
+                    if respuesta.status_code == 200:
+                        break
+                except Exception:
+                    dormido = True
+                if monotonic() >= limite:
+                    logger.warning("POT provider externo no despertó en %ss", int(espera_s))
+                    return False
+                await asyncio.sleep(2.0)
+            if dormido:
+                # Arranque en frío: un mint de calentamiento deja BotGuard
+                # cargado y el token de la extracción sale enseguida.
+                try:
+                    await client.post(
+                        f"{base}/get_pot",
+                        json={"content_binding": "calentar"},
+                        timeout=25.0,
+                    )
+                except Exception:
+                    pass
+        return True
     except Exception:
-        pass
+        return False
 
 
 def auto_heal_disparado() -> bool:
