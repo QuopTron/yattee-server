@@ -226,6 +226,10 @@ async def diag(test: int = 0):
             "habilitado": pot_provider.auto_heal_habilitado(),
             "disparado": pot_provider.auto_heal_disparado(),
         },
+        "memoria": {
+            "limite_mb": pot_provider.memoria_limite_mb(),
+            "provider_embebido_permitido": pot_provider.cabe_el_provider_embebido(),
+        },
     }
     if not test:
         return datos

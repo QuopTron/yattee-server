@@ -39,6 +39,45 @@ def bundle_available() -> bool:
     return NODE_BIN.is_file() and MAIN_JS.is_file()
 
 
+def memoria_limite_mb() -> Optional[int]:
+    """Límite de memoria del contenedor en MB (cgroup v2 o v1), o None."""
+    for ruta in (
+        "/sys/fs/cgroup/memory.max",
+        "/sys/fs/cgroup/memory/memory.limit_in_bytes",
+    ):
+        try:
+            texto = Path(ruta).read_text().strip()
+        except OSError:
+            continue
+        if texto.isdigit():
+            mb = int(texto) // (1024 * 1024)
+            # "max" y los límites absurdos (2^63) significan "sin límite".
+            if 0 < mb < 1_000_000:
+                return mb
+    return None
+
+
+# Un yt-dlp + uvicorn + node(BotGuard) no entra en 512 MB: el contenedor muere
+# por OOM en plena extracción y el servicio entero se cae (502 para todo).
+# Debajo de este umbral el provider embebido NO se arranca; se usa uno externo
+# (YT_POT_PROVIDER_URL) o se sube la memoria de la instancia.
+MIN_MB_PARA_POT_EMBEBIDO = 900
+
+
+def cabe_el_provider_embebido() -> bool:
+    """¿Hay memoria para levantar node dentro de ESTA instancia?"""
+    limite = memoria_limite_mb()
+    if limite is not None and limite < MIN_MB_PARA_POT_EMBEBIDO:
+        logger.warning(
+            "POT provider embebido omitido: la instancia tiene %s MB y necesita "
+            "~%s MB (usá YT_POT_PROVIDER_URL en un servicio aparte o subí la memoria)",
+            limite,
+            MIN_MB_PARA_POT_EMBEBIDO,
+        )
+        return False
+    return True
+
+
 async def _ping(timeout: float = 2.0) -> bool:
     # trust_env=False: HTTP(S)_PROXY env must never intercept the localhost ping
     try:
@@ -85,7 +124,12 @@ class PotProviderManager:
 
         Called at startup and whenever POT settings change via the admin API.
         """
-        want = s.yt_pot_enabled and not s.effective_pot_provider_url() and bundle_available()
+        want = (
+            s.yt_pot_enabled
+            and not s.effective_pot_provider_url()
+            and bundle_available()
+            and cabe_el_provider_embebido()
+        )
         if want and self._task is None:
             await self.start()
         elif not want and self._task is not None:
@@ -241,6 +285,9 @@ async def auto_heal_for_wall() -> bool:
     """Enciende el provider bundled si el muro de bot apareció. Una vez por proceso."""
     global _AUTO_HEAL_HECHO
     if _AUTO_HEAL_HECHO or not auto_heal_habilitado() or not bundle_available():
+        return False
+    if not cabe_el_provider_embebido():
+        _AUTO_HEAL_HECHO = True
         return False
     try:
         from settings import get_settings, save_settings
