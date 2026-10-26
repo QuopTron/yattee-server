@@ -53,10 +53,15 @@ def ytdlp_client_args(s) -> List[str]:
     pot_args = ytdlp_pot_args(s)
     hay_pot = s.yt_pot_enabled and any("youtubepot-bgutilhttp:base_url=" in a for a in pot_args)
     # web_embedded,mweb: the stable pair proven on 512MB. android(+pot) was
-    # tried and OOM-killed every cold extraction on Render free; android_vr
-    # gets a gvs 403 without a PO token. Keep fetch_pot=never unless the
-    # provider is actually reachable (ytdlp_pot_args already handles that).
-    pares = ["fetch_pot=always" if hay_pot else "fetch_pot=never", "player-client=web_embedded,mweb"]
+    # tried and OOM-killed every cold extraction on Render free.
+    #
+    # CON PO token se deja que yt-dlp elija sus clientes: los de web, que son
+    # los que aceptan el token, y no los dos "embebidos" que antes se fijaban
+    # para esquivar el muro. Sin provider (o sin memoria para el) se mantiene el
+    # par probado, que es el único que extrae con 512 MB y sin tokens.
+    pares = ["fetch_pot=always" if hay_pot else "fetch_pot=never"]
+    if not hay_pot:
+        pares.append("player-client=web_embedded,mweb")
     return ["--extractor-args", "youtube:" + ";".join(pares)]
 
 
