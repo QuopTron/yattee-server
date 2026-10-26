@@ -222,6 +222,10 @@ async def diag(test: int = 0):
         # provider está apagado: `false` explícito gana sobre el encendido auto).
         "pot_env": config.YT_POT_ENABLED,
         "pot_provider_url": config.YT_POT_PROVIDER_URL,
+        "pot_auto_heal": {
+            "habilitado": pot_provider.auto_heal_habilitado(),
+            "disparado": pot_provider.auto_heal_disparado(),
+        },
     }
     if not test:
         return datos

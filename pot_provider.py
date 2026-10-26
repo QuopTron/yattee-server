@@ -206,4 +206,54 @@ class PotProviderManager:
             pass
 
 
+# ── Auto-encendido cuando aparece el muro de bot ─────────────────────
+#
+# En un host de datacenter (Render, Fly, Railway) YouTube contesta
+# "Sign in to confirm you're not a bot" y todo /videos cae en 404, con o sin
+# cookies: la sesión se considera deslogueada desde esas IPs. El PO token del
+# provider horneado es la única salida, pero depende de una variable de entorno
+# que es fácil que quede en `false` de una prueba anterior.
+#
+# En vez de obligar a alguien a recordarlo, el servidor se cura solo: la PRIMERA
+# vez que ve el muro enciende el provider (una sola vez por proceso). Se puede
+# apagar con `YT_POT_AUTO_HEAL=false`.
+_AUTO_HEAL_HECHO = False
+
+
+def auto_heal_habilitado() -> bool:
+    valor = os.getenv("YT_POT_AUTO_HEAL", "true").strip().lower()
+    return valor not in ("false", "0", "no")
+
+
+def auto_heal_disparado() -> bool:
+    """¿Este proceso ya intentó curarse del muro de bot?"""
+    return _AUTO_HEAL_HECHO
+
+
+async def auto_heal_for_wall() -> bool:
+    """Enciende el provider bundled si el muro de bot apareció. Una vez por proceso."""
+    global _AUTO_HEAL_HECHO
+    if _AUTO_HEAL_HECHO or not auto_heal_habilitado() or not bundle_available():
+        return False
+    try:
+        from settings import get_settings, save_settings
+
+        s = get_settings()
+        if s.yt_pot_enabled or s.effective_pot_provider_url():
+            _AUTO_HEAL_HECHO = True
+            return False
+        _AUTO_HEAL_HECHO = True
+        s.yt_pot_enabled = True
+        save_settings(s)
+        logger.warning(
+            "Muro de bot de YouTube detectado: enciendo el PO token provider "
+            "(bgutil). Desactivá esto con YT_POT_AUTO_HEAL=false."
+        )
+        await manager.apply_settings(s)
+        return True
+    except Exception as e:  # nunca romper la extracción por el auto-encendido
+        logger.warning("Auto-encendido del POT provider falló: %s", e)
+        return False
+
+
 manager = PotProviderManager()

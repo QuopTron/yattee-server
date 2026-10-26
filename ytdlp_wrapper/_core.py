@@ -79,6 +79,17 @@ def ytdlp_network_args(s) -> List[str]:
     return args
 
 
+def _es_muro_de_bot(stderr: str) -> bool:
+    """¿yt-dlp chocó con el muro de "no sos un bot" de YouTube?"""
+    texto = (stderr or "").lower()
+    return (
+        "sign in to confirm you" in texto
+        or "confirm you're not a bot" in texto
+        or "confirm you’re not a bot" in texto
+        or "login_required" in texto
+    )
+
+
 def _separate_flags_and_urls(args: tuple) -> Tuple[List[str], List[str]]:
     """Separate yt-dlp arguments into flags and URLs.
 
@@ -200,6 +211,14 @@ async def run_ytdlp_ex(
         import cookie_health
 
         cookie_health.inspect_ytdlp_stderr(stderr_text, cookie_ids)
+
+    # Muro de bot: es el síntoma de una IP de datacenter sin PO token. Se
+    # enciende el provider en segundo plano (no frena esta respuesta) para que
+    # el próximo intento ya salga con token.
+    if _es_muro_de_bot(stderr_text):
+        import pot_provider
+
+        asyncio.create_task(pot_provider.auto_heal_for_wall())
 
     if proc.returncode != 0:
         error_msg = stderr_text or "Unknown error"
