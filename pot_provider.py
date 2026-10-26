@@ -276,6 +276,26 @@ def auto_heal_habilitado() -> bool:
     return valor not in ("false", "0", "no")
 
 
+async def despertar_externo() -> None:
+    """Despierta el provider EXTERNO (otro servicio que puede estar dormido).
+
+    Un plan free apaga la instancia por inactividad y el primer mint pagaría
+    30-50 s de arranque, justo cuando el reproductor ya está esperando. La
+    búsqueda siempre llega antes que la extracción, así que se aprovecha ese
+    momento para picar el provider (best-effort, nunca lanza).
+    """
+    try:
+        from settings import get_settings
+
+        url = get_settings().effective_pot_provider_url()
+        if not url:
+            return
+        async with httpx.AsyncClient(timeout=8.0) as client:
+            await client.get(f"{url.rstrip('/')}/ping")
+    except Exception:
+        pass
+
+
 def auto_heal_disparado() -> bool:
     """¿Este proceso ya intentó curarse del muro de bot?"""
     return _AUTO_HEAL_HECHO

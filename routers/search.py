@@ -60,6 +60,14 @@ async def search(
     type: Optional[str] = Query("video", description="Result type: video, channel, playlist, or all"),
 ) -> List[Union[VideoListItem, ChannelListItem, PlaylistListItem]]:
     """Search for videos, channels, or playlists (Invidious-compatible)."""
+    # Si el PO token provider vive en otro servicio free, se lo despierta acá:
+    # la búsqueda siempre llega antes que la extracción y no queremos que el
+    # primer mint pague 30-50 s de arranque en pleno play.
+    import asyncio
+
+    import pot_provider
+
+    asyncio.create_task(pot_provider.despertar_externo())
     if not q.strip():
         raise HTTPException(status_code=400, detail="Query cannot be empty")
 
