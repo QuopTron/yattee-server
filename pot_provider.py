@@ -137,12 +137,19 @@ class PotProviderManager:
                 continue
             self._external_process = False
             try:
+                # Techo de heap para el provider: en un host de 512 MB (Render
+                # free) node se come el presupuesto y el contenedor muere por
+                # OOM en plena extracción. Con el heap acotado V8 hace GC en vez
+                # de crecer sin freno; el mint del token sigue funcionando.
+                entorno = dict(os.environ)
+                entorno.setdefault("NODE_OPTIONS", "--max-old-space-size=192")
                 self._proc = await asyncio.create_subprocess_exec(
                     str(NODE_BIN),
                     str(MAIN_JS),
                     "--port",
                     str(POT_PORT),
                     cwd=str(BUNDLE_DIR),
+                    env=entorno,
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.STDOUT,
                 )
