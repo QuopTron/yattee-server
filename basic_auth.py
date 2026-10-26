@@ -24,6 +24,7 @@ _failed_attempts: Dict[str, list] = defaultdict(list)
 # Public endpoints that don't require authentication
 PUBLIC_PATHS = [
     "/health",
+    "/diag",  # diagnóstico sin secretos: versión, cookies y error real de extracción
     "/setup",
     "/setup/status",
     "/api/setup",

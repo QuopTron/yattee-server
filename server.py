@@ -193,6 +193,56 @@ def get_server_version() -> str:
     return f"{base_version}-{git_hash}" if git_hash else base_version
 
 
+_diag_cache: dict = {"at": 0.0, "data": None}
+
+
+@app.get("/diag")
+async def diag(test: int = 0):
+    """Diagnóstico público y sin secretos.
+
+    Existe porque depurar un fallo de extracción desde fuera era adivinar: con
+    este endpoint se ve la versión que corre de verdad, si las cookies quedaron
+    provisionadas y —con `?test=1`— el error crudo de una extracción de prueba
+    (cacheada 5 minutos para que nadie use el servidor como banco de pruebas).
+    """
+    import time as _t
+    import cookie_health
+    from ytdlp_wrapper import get_video_info
+
+    s = get_settings()
+    datos = {
+        "version": get_server_version(),
+        "ytdlp": await get_version([s.ytdlp_path, "--version"]),
+        "cookies": cookie_health.status_summary(),
+        "pot": pot_provider.manager.status(),
+    }
+    if not test:
+        return datos
+
+    if _t.time() - _diag_cache["at"] < 300 and _diag_cache["data"]:
+        return {**datos, "test": _diag_cache["data"], "cacheado": True}
+
+    inicio = _t.time()
+    try:
+        info = await get_video_info("dQw4w9WgXcQ", use_cache=False)
+        formatos = [f for f in (info.get("formats") or []) if str(f.get("acodec")) != "none"]
+        resultado = {
+            "ok": bool(formatos),
+            "ms": round((_t.time() - inicio) * 1000),
+            "formatos": len(formatos),
+            "titulo": info.get("title"),
+            "duracion": info.get("duration"),
+        }
+    except Exception as e:
+        resultado = {
+            "ok": False,
+            "ms": round((_t.time() - inicio) * 1000),
+            "error": str(e)[:400],
+        }
+    _diag_cache.update({"at": _t.time(), "data": resultado})
+    return {**datos, "test": resultado}
+
+
 @app.get("/info")
 async def info():
     """Server info with dependency versions."""
