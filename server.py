@@ -209,7 +209,7 @@ _diag_cache: dict = {"at": 0.0, "data": None}
 
 
 @app.get("/diag")
-async def diag(test: int = 0):
+async def diag(test: int = 0, id: str = ""):
     """Diagnóstico público y sin secretos.
 
     Existe porque depurar un fallo de extracción desde fuera era adivinar: con
@@ -251,7 +251,7 @@ async def diag(test: int = 0):
 
     inicio = _t.time()
     try:
-        info = await get_video_info("dQw4w9WgXcQ", use_cache=False)
+        info = await get_video_info(id or "dQw4w9WgXcQ", use_cache=False)
         formatos = [f for f in (info.get("formats") or []) if str(f.get("acodec")) != "none"]
         resultado = {
             "ok": bool(formatos),
