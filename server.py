@@ -209,12 +209,19 @@ async def diag(test: int = 0):
     import cookie_health
     from ytdlp_wrapper import get_video_info
 
+    import config
+
     s = get_settings()
     datos = {
+        "rev": "2026-10-26-r3",
         "version": get_server_version(),
         "ytdlp": await get_version([s.ytdlp_path, "--version"]),
         "cookies": cookie_health.status_summary(),
         "pot": pot_provider.manager.status(),
+        # Qué dijo el operador por entorno (no es secreto y explica por qué el
+        # provider está apagado: `false` explícito gana sobre el encendido auto).
+        "pot_env": config.YT_POT_ENABLED,
+        "pot_provider_url": config.YT_POT_PROVIDER_URL,
     }
     if not test:
         return datos
