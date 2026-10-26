@@ -205,6 +205,13 @@ def get_server_version() -> str:
     return f"{base_version}-{git_hash}" if git_hash else base_version
 
 
+def _plugin_pot_instalado() -> bool:
+    """¿Está el plugin de yt-dlp que pide los tokens al provider?"""
+    import importlib.util
+
+    return importlib.util.find_spec("yt_dlp_plugins.extractor.youtubepot_bgutilhttp") is not None
+
+
 # La prueba de extracción se cachea por video: con una sola entrada, probar un
 # id devolvía el resultado del anterior y parecía que el nuevo también fallaba.
 _diag_cache: dict = {"at": 0.0, "data": None, "id": ""}
@@ -235,6 +242,9 @@ async def diag(test: int = 0, id: str = ""):
         # Qué dijo el operador por entorno (no es secreto y explica por qué el
         # provider está apagado: `false` explícito gana sobre el encendido auto).
         "pot_env": config.YT_POT_ENABLED,
+        # Sin el plugin de yt-dlp el provider queda de adorno: los tokens se
+        # mintean pero nadie los pide, y el muro de bot sigue igual.
+        "pot_plugin": _plugin_pot_instalado(),
         "pot_provider_url": config.YT_POT_PROVIDER_URL,
         "pot_auto_heal": {
             "habilitado": pot_provider.auto_heal_habilitado(),
