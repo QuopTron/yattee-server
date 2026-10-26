@@ -178,12 +178,21 @@ class TestSettingsModel:
         assert s.yt_pot_enabled is False
         assert s.yt_pot_provider_url is None
 
-    def test_effective_pot_provider_url(self):
-        """Test that empty/None external URL means bundled provider (None)."""
-        assert Settings().effective_pot_provider_url() is None
-        assert Settings(yt_pot_provider_url="").effective_pot_provider_url() is None
+    def test_effective_pot_provider_url(self, monkeypatch):
+        """La URL configurada manda; sin ella depende de la memoria."""
+        import pot_provider
+        from settings import POT_PROVIDER_POR_DEFECTO
+
         s = Settings(yt_pot_provider_url="http://pot-host:4416")
         assert s.effective_pot_provider_url() == "http://pot-host:4416"
+
+        # Instancia chica (Render free): se usa el provider en su propio servicio.
+        monkeypatch.setattr(pot_provider, "memoria_alcanza_para_embebido", lambda: False)
+        assert Settings().effective_pot_provider_url() == POT_PROVIDER_POR_DEFECTO
+
+        # Instancia con memoria: el provider embebido alcanza y no hace falta otro.
+        monkeypatch.setattr(pot_provider, "memoria_alcanza_para_embebido", lambda: True)
+        assert Settings().effective_pot_provider_url() is None
 
     def test_invidious_instance_optional(self):
         """Test that invidious_instance is optional."""

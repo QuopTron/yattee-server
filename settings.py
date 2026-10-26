@@ -9,6 +9,17 @@ import database
 
 logger = logging.getLogger(__name__)
 
+# Servicio del PO token provider que acompaña a esta instancia.
+#
+# En una instancia de 512 MB (Render free) el provider embebido no entra y el
+# contenedor muere por OOM, así que la imagen `Dockerfile.pot` se despliega
+# aparte y se usa por HTTP. Poner su URL en `YT_POT_PROVIDER_URL` es un paso
+# manual del panel que se olvida —y sin él el muro de bot deja el audio de
+# YouTube mudo—, así que la URL queda como valor por defecto: la variable de
+# entorno sigue mandando si existe, y si el servicio se borra o se renombra
+# basta con definirla para apuntar a otro lado.
+POT_PROVIDER_POR_DEFECTO = "https://yattee-pot.onrender.com"
+
 
 class Settings(BaseModel):
     """Runtime application settings stored in database."""
@@ -142,8 +153,20 @@ class Settings(BaseModel):
         return self.yt_egress_proxy if self.yt_egress_proxy_enabled and self.yt_egress_proxy else None
 
     def effective_pot_provider_url(self) -> Optional[str]:
-        """Return the external POT provider URL, or None (bundled provider implied)."""
-        return self.yt_pot_provider_url or None
+        """Return the external POT provider URL, or None (bundled provider).
+
+        Order: the configured URL wins; then the bundled provider if the
+        instance has memory for it; and finally the companion provider service
+        (``POT_PROVIDER_POR_DEFECTO``), so a 512 MB deploy does not depend on
+        someone remembering to set ``YT_POT_PROVIDER_URL`` in the dashboard.
+        """
+        if self.yt_pot_provider_url:
+            return self.yt_pot_provider_url
+        import pot_provider  # late import: settings <-> pot_provider cycle
+
+        if pot_provider.memoria_alcanza_para_embebido():
+            return None
+        return POT_PROVIDER_POR_DEFECTO
 
     def effective_ip_family(self) -> str:
         """Return the forced IP family, or "auto" while the egress proxy is active.

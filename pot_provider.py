@@ -64,6 +64,13 @@ def memoria_limite_mb() -> Optional[int]:
 MIN_MB_PARA_POT_EMBEBIDO = 900
 
 
+def memoria_alcanza_para_embebido() -> bool:
+    """¿Entra el provider embebido? Sin aviso: lo consulta `settings` en cada
+    lectura y el registro se llenaría de la misma advertencia."""
+    limite = memoria_limite_mb()
+    return limite is None or limite >= MIN_MB_PARA_POT_EMBEBIDO
+
+
 def cabe_el_provider_embebido() -> bool:
     """¿Hay memoria para levantar node dentro de ESTA instancia?"""
     limite = memoria_limite_mb()
