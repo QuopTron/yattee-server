@@ -1,0 +1,46 @@
+# Servicio SOLO del PO token provider (bgutil).
+#
+# Por qué existe: en una instancia de 512 MB (Render free) yt-dlp + uvicorn +
+# node(BotGuard) no entran juntos y el contenedor muere por OOM en plena
+# extracción. Esta imagen levanta únicamente el provider, en su propio servicio,
+# y el servidor principal lo usa con `YT_POT_PROVIDER_URL=http://<host>:<puerto>`.
+#
+# Despliegue (Render → New → Web Service → este repo):
+#   · Dockerfile Path: Dockerfile.pot
+#   · Health Check Path: /ping
+#   · Plan: Free alcanza (el provider solo pesa ~200 MB)
+# Después, en el servicio principal:
+#   · YT_POT_ENABLED=true
+#   · YT_POT_PROVIDER_URL=https://<url-del-servicio-provider>
+
+ARG POT_PROVIDER_VERSION=1.3.2
+
+FROM node:22-bookworm-slim
+
+ARG POT_PROVIDER_VERSION
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates curl \
+    && rm -rf /var/lib/apt/lists/*
+
+ADD https://github.com/Brainicism/bgutil-ytdlp-pot-provider/archive/refs/tags/${POT_PROVIDER_VERSION}.tar.gz /tmp/pot.tar.gz
+
+RUN mkdir -p /app \
+    && tar xzf /tmp/pot.tar.gz -C /app --strip-components=1 \
+    && rm /tmp/pot.tar.gz
+
+WORKDIR /app/server
+
+RUN npm ci --no-audit --no-fund \
+    && npx tsc \
+    && test -f build/main.js \
+    && npm ci --omit=dev --no-audit --no-fund
+
+# Heap acotado: el contenedor es chico y BotGuard crece de golpe al mintear.
+ENV NODE_OPTIONS=--max-old-space-size=320
+ENV PORT=4416
+
+EXPOSE 4416
+
+# Forma shell a propósito: los PaaS (Render) inyectan $PORT en runtime.
+CMD node build/main.js --port ${PORT:-4416}
