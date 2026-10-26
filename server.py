@@ -209,7 +209,7 @@ def _plugin_pot_instalado() -> bool:
     """¿Está el plugin de yt-dlp que pide los tokens al provider?"""
     import importlib.util
 
-    return importlib.util.find_spec("yt_dlp_plugins.extractor.youtubepot_bgutilhttp") is not None
+    return importlib.util.find_spec("yt_dlp_plugins.extractor.getpot_bgutil_http") is not None
 
 
 # La prueba de extracción se cachea por video: con una sola entrada, probar un
@@ -218,7 +218,7 @@ _diag_cache: dict = {"at": 0.0, "data": None, "id": ""}
 
 
 @app.get("/diag")
-async def diag(test: int = 0, id: str = ""):
+async def diag(test: int = 0, id: str = "", verbose: int = 0):
     """Diagnóstico público y sin secretos.
 
     Existe porque depurar un fallo de extracción desde fuera era adivinar: con
@@ -270,6 +270,25 @@ async def diag(test: int = 0, id: str = ""):
         # La prueba sigue el camino real: si el provider vive en otro servicio
         # free que se durmió, se lo espera igual que en /videos.
         await pot_provider.despertar_externo()
+        if verbose:
+            # Camino crudo con -v: el texto del plugin de PO tokens (y sus
+            # errores al hablar con el provider) sólo aparece ahí.
+            from ytdlp_wrapper._core import run_ytdlp_ex
+
+            corrida = await run_ytdlp_ex(
+                "-v",
+                "-j",
+                "--no-download",
+                "--no-playlist",
+                f"https://www.youtube.com/watch?v={id or 'dQw4w9WgXcQ'}",
+            )
+            return {
+                **datos,
+                "test": {
+                    "ok": True,
+                    "stderr": corrida.stderr[-3000:],
+                },
+            }
         info = await get_video_info(id or "dQw4w9WgXcQ", use_cache=False)
         formatos = [f for f in (info.get("formats") or []) if str(f.get("acodec")) != "none"]
         resultado = {
