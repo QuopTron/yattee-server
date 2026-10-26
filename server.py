@@ -205,7 +205,9 @@ def get_server_version() -> str:
     return f"{base_version}-{git_hash}" if git_hash else base_version
 
 
-_diag_cache: dict = {"at": 0.0, "data": None}
+# La prueba de extracción se cachea por video: con una sola entrada, probar un
+# id devolvía el resultado del anterior y parecía que el nuevo también fallaba.
+_diag_cache: dict = {"at": 0.0, "data": None, "id": ""}
 
 
 @app.get("/diag")
@@ -246,7 +248,11 @@ async def diag(test: int = 0, id: str = ""):
     if not test:
         return datos
 
-    if _t.time() - _diag_cache["at"] < 300 and _diag_cache["data"]:
+    if (
+        _t.time() - _diag_cache["at"] < 300
+        and _diag_cache["data"]
+        and _diag_cache["id"] == (id or "dQw4w9WgXcQ")
+    ):
         return {**datos, "test": _diag_cache["data"], "cacheado": True}
 
     inicio = _t.time()
@@ -269,7 +275,7 @@ async def diag(test: int = 0, id: str = ""):
             "ms": round((_t.time() - inicio) * 1000),
             "error": str(e)[:400],
         }
-    _diag_cache.update({"at": _t.time(), "data": resultado})
+    _diag_cache.update({"at": _t.time(), "data": resultado, "id": id or "dQw4w9WgXcQ"})
     return {**datos, "test": resultado}
 
 
