@@ -234,7 +234,7 @@ async def diag(test: int = 0, id: str = "", verbose: int = 0, client: str = ""):
 
     s = get_settings()
     datos = {
-        "rev": "2026-10-26-r3",
+        "rev": "2026-10-27-r1",
         "version": get_server_version(),
         "ytdlp": await get_version([s.ytdlp_path, "--version"]),
         "cookies": cookie_health.status_summary(),
@@ -246,6 +246,9 @@ async def diag(test: int = 0, id: str = "", verbose: int = 0, client: str = ""):
         # mintean pero nadie los pide, y el muro de bot sigue igual.
         "pot_plugin": _plugin_pot_instalado(),
         "pot_provider_url": config.YT_POT_PROVIDER_URL,
+        # Lista de clients fijada a mano (si la hay): explica por qué una prueba
+        # usa "web_embedded" y no lo que yt-dlp elegiría solo.
+        "player_clients": os.environ.get("YT_PLAYER_CLIENTS") or None,
         "pot_auto_heal": {
             "habilitado": pot_provider.auto_heal_habilitado(),
             "disparado": pot_provider.auto_heal_disparado(),
