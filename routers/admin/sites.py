@@ -182,13 +182,25 @@ async def delete_site(site_id: int, admin: dict = Depends(get_current_admin)):
 
 
 @router.post("/api/sites/{site_id}/credentials", response_model=CredentialResponse)
-async def add_credential(site_id: int, data: CredentialCreate, admin: dict = Depends(get_current_admin)):
-    """Add a credential to a site."""
+async def add_credential(
+    site_id: int,
+    data: CredentialCreate,
+    force: bool = False,
+    admin: dict = Depends(get_current_admin),
+):
+    """Add a credential to a site.
+
+    `force=1` guarda el jar aunque la prueba diga que está deslogueado. Existe
+    porque la prueba se hace desde la IP del servidor: un jar válido exportado de
+    un navegador puede reportar LOGGED_IN=false desde un datacenter y aun así
+    servir para extraer, así que rechazarlo sin salida dejaba al operador sin
+    forma de probarlo.
+    """
     site = database.get_site(site_id)
     if not site:
         raise HTTPException(status_code=404, detail="Site not found")
 
-    probe = await _reject_logged_out_jar(site["extractor_pattern"], data)
+    probe = await _reject_logged_out_jar(site["extractor_pattern"], data, force=force)
 
     is_encrypted = encryption.should_encrypt(data.credential_type)
     value = encryption.encrypt(data.value) if is_encrypted else data.value
@@ -465,7 +477,7 @@ def _is_youtube_cookie_jar(extractor_pattern: str, cred: CredentialCreate) -> bo
 
 
 async def _reject_logged_out_jar(
-    extractor_pattern: str, cred: CredentialCreate
+    extractor_pattern: str, cred: CredentialCreate, force: bool = False
 ) -> Optional[cookie_health.ProbeResult]:
     """Probe a new YouTube cookie jar; 400 if YouTube already reports it logged out.
 
@@ -478,7 +490,7 @@ async def _reject_logged_out_jar(
         f"[Sites] Upload probe: logged_in={result.logged_in} auth_cookies={result.has_auth_cookies} "
         f"error={result.error}"
     )
-    if result.logged_in is False:
+    if result.logged_in is False and not force:
         raise HTTPException(
             status_code=400,
             detail=(
