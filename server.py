@@ -281,6 +281,9 @@ async def diag(test: int = 0, id: str = "", verbose: int = 0, client: str = ""):
             anterior = os.environ.get("YT_PLAYER_CLIENTS")
             if client:
                 os.environ["YT_PLAYER_CLIENTS"] = client
+            from ytdlp_wrapper._core import ytdlp_client_args
+
+            args_cliente = ytdlp_client_args(s)
             try:
                 corrida = await run_ytdlp_ex(
                     "-v",
@@ -298,6 +301,8 @@ async def diag(test: int = 0, id: str = "", verbose: int = 0, client: str = ""):
                 **datos,
                 "test": {
                     "ok": True,
+                    "client_param": client,
+                    "args_cliente": args_cliente,
                     "stderr": corrida.stderr[-3000:],
                 },
             }
