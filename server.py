@@ -303,6 +303,9 @@ async def diag(test: int = 0, id: str = "", verbose: int = 0):
             "ok": False,
             "ms": round((_t.time() - inicio) * 1000),
             "error": str(e)[:1600],
+            # El final es lo que explica el fallo (el principio es la cabecera
+            # de -v); sin esto había que adivinar por qué no salía el formato.
+            "cola": str(e)[-5000:],
         }
     _diag_cache.update({"at": _t.time(), "data": resultado, "id": id or "dQw4w9WgXcQ"})
     return {**datos, "test": resultado}
