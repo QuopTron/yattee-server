@@ -218,7 +218,7 @@ _diag_cache: dict = {"at": 0.0, "data": None, "id": ""}
 
 
 @app.get("/diag")
-async def diag(test: int = 0, id: str = "", verbose: int = 0):
+async def diag(test: int = 0, id: str = "", verbose: int = 0, client: str = ""):
     """Diagnóstico público y sin secretos.
 
     Existe porque depurar un fallo de extracción desde fuera era adivinar: con
@@ -275,13 +275,22 @@ async def diag(test: int = 0, id: str = "", verbose: int = 0):
             # errores al hablar con el provider) sólo aparece ahí.
             from ytdlp_wrapper._core import run_ytdlp_ex
 
-            corrida = await run_ytdlp_ex(
-                "-v",
-                "-j",
-                "--no-download",
-                "--no-playlist",
-                f"https://www.youtube.com/watch?v={id or 'dQw4w9WgXcQ'}",
-            )
+            anterior = os.environ.get("YT_PLAYER_CLIENTS")
+            if client:
+                os.environ["YT_PLAYER_CLIENTS"] = client
+            try:
+                corrida = await run_ytdlp_ex(
+                    "-v",
+                    "-j",
+                    "--no-download",
+                    "--no-playlist",
+                    f"https://www.youtube.com/watch?v={id or 'dQw4w9WgXcQ'}",
+                )
+            finally:
+                if anterior is None:
+                    os.environ.pop("YT_PLAYER_CLIENTS", None)
+                else:
+                    os.environ["YT_PLAYER_CLIENTS"] = anterior
             return {
                 **datos,
                 "test": {

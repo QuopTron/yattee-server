@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+import os
 from dataclasses import dataclass, field
 from typing import List, Optional, Tuple
 
@@ -60,7 +61,14 @@ def ytdlp_client_args(s) -> List[str]:
     # para esquivar el muro. Sin provider (o sin memoria para el) se mantiene el
     # par probado, que es el único que extrae con 512 MB y sin tokens.
     pares = ["fetch_pot=always" if hay_pot else "fetch_pot=never"]
-    if not hay_pot:
+    forzados = (os.environ.get("YT_PLAYER_CLIENTS") or "").strip()
+    if forzados:
+        # Salida de emergencia: desde una IP de datacenter el muro de YouTube
+        # cambia de cliente en cliente ("tv_samsung", "visionos" y "web"
+        # contestan LOGIN_REQUIRED aunque el token de PO sea válido). Con esto se
+        # fija la lista sin tocar código ni redesplegar chatarra.
+        pares.append(f"player-client={forzados}")
+    elif not hay_pot:
         pares.append("player-client=web_embedded,mweb")
     return ["--extractor-args", "youtube:" + ";".join(pares)]
 
