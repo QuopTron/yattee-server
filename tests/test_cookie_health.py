@@ -139,12 +139,19 @@ class TestMarking:
         )
         assert database.get_credential(youtube_cookie_cred)["status"] == "stale"
 
-    async def test_validate_all_flips_status_both_ways(self, youtube_cookie_cred):
+    async def test_validate_all_reports_probe_but_does_not_flip(self, youtube_cookie_cred):
+        """La prueba de GET se reporta, pero no degrada un jar que sí extrae.
+
+        Desde la IP del servidor (datacenter) youtube.com contestó
+        LOGGED_IN=false para un jar con el que yt-dlp extraía once formatos: si
+        eso marcara stale, el canal se quedaba sin cookies sin motivo.
+        """
         with patch("innertube._client.get_client", AsyncMock(return_value=_mock_client('"LOGGED_IN":false'))):
             results = await cookie_health.validate_all()
         assert results[0]["credential_id"] == youtube_cookie_cred
-        assert results[0]["status"] == "stale"
-        assert database.get_credential(youtube_cookie_cred)["status"] == "stale"
+        assert results[0]["logged_in"] is False
+        assert results[0]["status"] == "ok"
+        assert database.get_credential(youtube_cookie_cred)["status"] == "ok"
 
         with patch("innertube._client.get_client", AsyncMock(return_value=_mock_client('"LOGGED_IN":true'))):
             results = await cookie_health.validate_all(site_id=1)

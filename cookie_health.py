@@ -193,7 +193,24 @@ async def validate_credential(cred: dict) -> ProbeResult:
     if result.logged_in is True:
         mark_ok(cred_id)
     elif result.logged_in is False:
-        mark_stale(cred_id, "probe: youtube.com reports LOGGED_IN=false")
+        # NO se marca stale por esto. La prueba es un GET a youtube.com desde la
+        # IP del servidor y desde un datacenter da falsos negativos: se vio un
+        # jar que extraía 11 formatos de audio con yt-dlp y que la prueba daba
+        # por deslogueado, dejando el canal sin cookies sin motivo. La rotación
+        # real se detecta con la advertencia de yt-dlp
+        # (`inspect_ytdlp_stderr`) y con los reintentos anónimos exitosos
+        # (`record_failure`), que sí son evidencia de uso.
+        logger.warning(
+            f"[CookieHealth] Credential {cred_id}: probe says logged out; se deja el estado "
+            "como está (la prueba no es confiable desde esta IP)"
+        )
+        database.update_credential_status(
+            cred_id,
+            status=cred.get("status") or "ok",
+            stale_since=cred.get("stale_since"),
+            last_validated_at=_now(),
+            last_error=None,
+        )
     else:
         # Indeterminate: keep status, just note the attempt
         database.update_credential_status(
@@ -223,7 +240,10 @@ async def validate_all(site_id: Optional[int] = None) -> List[dict]:
                 "credential_id": cred["id"],
                 "site_id": cred["site_id"],
                 "logged_in": result.logged_in,
-                "status": "stale" if result.logged_in is False else ("ok" if result.logged_in else cred["status"]),
+                # `logged_in: false` se reporta, pero no cambia el estado: ver el
+                # comentario de `validate_credential` (la prueba da falsos
+                # negativos desde una IP de datacenter).
+                "status": "ok" if result.logged_in else cred["status"],
                 "error": result.error,
             }
         )
