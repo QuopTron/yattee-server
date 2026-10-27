@@ -68,7 +68,14 @@ def ytdlp_client_args(s) -> List[str]:
         # contestan LOGIN_REQUIRED aunque el token de PO sea válido). Con esto se
         # fija la lista sin tocar código ni redesplegar chatarra.
         pares.append(f"player-client={forzados}")
-    elif not hay_pot:
+    elif hay_pot:
+        # android_vr es el único cliente que contesta formatos con audio desde
+        # la IP de Render cuando hay PO token: "tv_samsung", "visionos" y "web"
+        # devuelven LOGIN_REQUIRED (muro de bot) y "web" además exige SABR, que
+        # deja los formatos sin URL. web_embedded queda de red por si el video
+        # no está en la lista del cliente de VR.
+        pares.append("player-client=android_vr,web_embedded")
+    else:
         pares.append("player-client=web_embedded,mweb")
     return ["--extractor-args", "youtube:" + ";".join(pares)]
 
