@@ -265,6 +265,11 @@ async def diag(test: int = 0, id: str = "", verbose: int = 0, client: str = ""):
         _t.time() - _diag_cache["at"] < 300
         and _diag_cache["data"]
         and _diag_cache["id"] == (id or "dQw4w9WgXcQ")
+        # Una prueba pedida a mano (verbose o con clientes fijados) nunca se
+        # sirve de la caché: si no, la primera corrida contesta todas las
+        # siguientes y parece que el cambio no entró.
+        and not verbose
+        and not client
     ):
         return {**datos, "test": _diag_cache["data"], "cacheado": True}
 
